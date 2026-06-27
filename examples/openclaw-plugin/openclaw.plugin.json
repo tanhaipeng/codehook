@@ -1,0 +1,9 @@
+{
+  "id": "codehook_policy",
+  "name": "Codehook Policy",
+  "description": "Runs the codehook policy binary before OpenClaw tool calls and agent runs.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false
+  }
+}

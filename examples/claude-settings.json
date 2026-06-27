@@ -1,0 +1,50 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Read|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CODEHOOK_AGENT=claude /path/to/codehook/target/release/codehook",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash|Read|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CODEHOOK_AGENT=claude /path/to/codehook/target/release/codehook",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CODEHOOK_AGENT=claude /path/to/codehook/target/release/codehook",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CODEHOOK_AGENT=claude CODEHOOK_USAGE_LOG=/path/to/codehook-usage.jsonl /path/to/codehook/target/release/codehook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

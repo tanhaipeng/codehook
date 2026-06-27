@@ -1,0 +1,52 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CODEHOOK_AGENT=codex /path/to/codehook/target/release/codehook",
+            "timeout": 10,
+            "statusMessage": "Checking repository hook policy"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "Bash|apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CODEHOOK_AGENT=codex /path/to/codehook/target/release/codehook",
+            "timeout": 10,
+            "statusMessage": "Checking approval request"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CODEHOOK_AGENT=codex /path/to/codehook/target/release/codehook",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CODEHOOK_AGENT=codex CODEHOOK_USAGE_LOG=/path/to/codehook-usage.jsonl /path/to/codehook/target/release/codehook",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
