@@ -51,8 +51,9 @@ codehook/
 
 `src/main.rs` is the binary entry point. It handles `--help`, reads hook JSON
 from stdin, loads runtime configuration from environment variables, optionally
-writes metadata-only audit entries, and prints a JSON decision only when the
-hook needs to block something.
+writes metadata-only audit entries, optionally prints post-tool details to
+stderr, and prints a stdout JSON decision only when the hook needs to block
+something.
 
 `src/lib.rs` contains the reusable hook logic. It defines the shared input
 shape, detects the caller agent, evaluates policy for tool and prompt events,
@@ -68,6 +69,13 @@ Usage tracking uses a side-channel flow:
 
 ```text
 stdin JSON or transcript JSONL -> usage extractor -> CODEHOOK_USAGE_LOG -> --usage-summary
+```
+
+Post-tool detail printing uses a separate side-channel so it does not interfere
+with hook decision stdout:
+
+```text
+post_tool_call JSON -> detail formatter -> stderr and/or CODEHOOK_TOOL_CALL_LOG
 ```
 
 `examples/` contains ready-to-adapt configuration snippets for Codex, Claude
@@ -247,11 +255,21 @@ hooks:
   pre_llm_call:
     - command: "/usr/bin/env CODEHOOK_AGENT=hermes CODEHOOK_USAGE_LOG=/path/to/codehook-usage.jsonl /path/to/codehook/target/release/codehook"
       timeout: 10
+  post_tool_call:
+    - matcher: "terminal|write_file|patch"
+      command: "/usr/bin/env CODEHOOK_AGENT=hermes CODEHOOK_PRINT_TOOL_DETAILS=1 CODEHOOK_TOOL_CALL_LOG=/path/to/codehook-tool-calls.jsonl /path/to/codehook/target/release/codehook"
+      timeout: 10
 ```
 
 Hermes runs configured commands with `shell=false`, so the example uses
 `/usr/bin/env CODEHOOK_AGENT=hermes ...` instead of shell-style inline
 assignment.
+
+For `post_tool_call`, `CODEHOOK_PRINT_TOOL_DETAILS=1` prints one JSON object to
+stderr with metadata, `tool_input`, `tool_response`, `tool_output`, and any
+extra payload fields. `CODEHOOK_TOOL_CALL_LOG` appends the same records as JSON
+Lines. These records can include full tool outputs, so use paths with suitable
+access controls.
 
 ## OpenClaw
 
@@ -288,4 +306,8 @@ Runtime configuration is via environment variables:
   entries. The log does not include full prompts, commands, or tool outputs.
 - `CODEHOOK_USAGE_LOG=/path/to/codehook-usage.jsonl` appends normalized token
   usage records when usage data is present in the payload or transcript.
+- `CODEHOOK_PRINT_TOOL_DETAILS=1` prints post-tool call detail records to
+  stderr as JSON.
+- `CODEHOOK_TOOL_CALL_LOG=/path/to/codehook-tool-calls.jsonl` appends post-tool
+  call detail records as JSON Lines.
 - `CODEHOOK_USAGE_FROM_TRANSCRIPT=0` disables transcript fallback extraction.

@@ -28,9 +28,9 @@ pub struct HookInput {
     pub tool_name: Option<String>,
     #[serde(default, alias = "toolInput", alias = "params")]
     pub tool_input: Option<Value>,
-    #[serde(default)]
+    #[serde(default, alias = "toolResponse", alias = "response", alias = "result")]
     pub tool_response: Option<Value>,
-    #[serde(default)]
+    #[serde(default, alias = "toolOutput", alias = "output")]
     pub tool_output: Option<Value>,
     #[serde(default, alias = "user_message")]
     pub prompt: Option<String>,
@@ -256,6 +256,47 @@ pub fn audit_line(input: &HookInput, outcome: &HookOutcome) -> String {
         "reason": reason,
     })
     .to_string()
+}
+
+pub fn tool_call_detail_line(input: &HookInput) -> Option<String> {
+    if !is_post_tool_event(input.event_name()) {
+        return None;
+    }
+
+    Some(tool_call_detail_value(input).to_string())
+}
+
+pub fn tool_call_detail_value(input: &HookInput) -> Value {
+    let mut map = serde_json::Map::new();
+
+    map.insert("timestamp".to_string(), json!(unix_timestamp()));
+    map.insert(
+        "agent".to_string(),
+        Value::String(format!("{:?}", input.detect_agent())),
+    );
+    insert_string(&mut map, "event", Some(input.event_name()));
+    insert_string(&mut map, "session_id", input.session_id.as_deref());
+    insert_string(&mut map, "cwd", input.cwd.as_deref());
+    insert_string(&mut map, "model", input.model.as_deref());
+    insert_string(&mut map, "tool_name", input.tool_name.as_deref());
+
+    if let Some(value) = &input.tool_input {
+        map.insert("tool_input".to_string(), value.clone());
+    }
+
+    if let Some(value) = &input.tool_response {
+        map.insert("tool_response".to_string(), value.clone());
+    }
+
+    if let Some(value) = &input.tool_output {
+        map.insert("tool_output".to_string(), value.clone());
+    }
+
+    if !input.extra.is_empty() {
+        map.insert("extra".to_string(), Value::Object(input.extra.clone()));
+    }
+
+    Value::Object(map)
 }
 
 pub fn usage_record_line(input: &HookInput) -> Option<String> {
@@ -501,6 +542,13 @@ fn unix_timestamp() -> u64 {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|duration| duration.as_secs())
         .unwrap_or_default()
+}
+
+fn is_post_tool_event(event: &str) -> bool {
+    matches!(
+        event,
+        "PostToolUse" | "post_tool_call" | "post_tool_use" | "after_tool_call"
+    )
 }
 
 fn evaluate_tool_guard(input: &HookInput, policy: &Policy) -> Option<String> {
@@ -1059,6 +1107,44 @@ mod tests {
         assert_eq!(value["usage"]["cached_input_tokens"], 3);
         assert_eq!(value["usage"]["reasoning_output_tokens"], 2);
         assert_eq!(value["usage"]["total_tokens"], 19);
+    }
+
+    #[test]
+    fn builds_post_tool_call_detail_line() {
+        let input = input(json!({
+            "session_id": "s",
+            "cwd": "/repo",
+            "hook_event_name": "post_tool_call",
+            "tool_name": "terminal",
+            "tool_input": {"command": "echo hi"},
+            "result": {"status": "ok"},
+            "output": "hi\n",
+            "duration_ms": 12
+        }));
+
+        let line = tool_call_detail_line(&input).expect("post-tool detail");
+        let value: Value = serde_json::from_str(&line).expect("detail json");
+
+        assert_eq!(value["agent"], "Hermes");
+        assert_eq!(value["event"], "post_tool_call");
+        assert_eq!(value["session_id"], "s");
+        assert_eq!(value["cwd"], "/repo");
+        assert_eq!(value["tool_name"], "terminal");
+        assert_eq!(value["tool_input"]["command"], "echo hi");
+        assert_eq!(value["tool_response"]["status"], "ok");
+        assert_eq!(value["tool_output"], "hi\n");
+        assert_eq!(value["extra"]["duration_ms"], 12);
+    }
+
+    #[test]
+    fn skips_tool_call_detail_for_non_post_events() {
+        let input = input(json!({
+            "hook_event_name": "pre_tool_call",
+            "tool_name": "terminal",
+            "tool_input": {"command": "echo hi"}
+        }));
+
+        assert_eq!(tool_call_detail_line(&input), None);
     }
 
     #[test]

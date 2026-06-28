@@ -6,3 +6,7 @@ hooks:
   pre_llm_call:
     - command: "/usr/bin/env CODEHOOK_AGENT=hermes CODEHOOK_USAGE_LOG=/path/to/codehook-usage.jsonl /path/to/codehook/target/release/codehook"
       timeout: 10
+  post_tool_call:
+    - matcher: "terminal|write_file|patch"
+      command: "/usr/bin/env CODEHOOK_AGENT=hermes CODEHOOK_PRINT_TOOL_DETAILS=1 CODEHOOK_TOOL_CALL_LOG=/path/to/codehook-tool-calls.jsonl /path/to/codehook/target/release/codehook"
+      timeout: 10

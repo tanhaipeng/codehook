@@ -6,8 +6,8 @@ use std::{
 };
 
 use codehook::{
-    HookInput, Policy, audit_line, evaluate, summarize_usage_jsonl, usage_record_line,
-    usage_record_line_from_value,
+    HookInput, Policy, audit_line, evaluate, summarize_usage_jsonl, tool_call_detail_line,
+    usage_record_line, usage_record_line_from_value,
 };
 
 fn main() -> ExitCode {
@@ -58,6 +58,18 @@ fn run() -> Result<(), String> {
 
     if let Ok(path) = env::var("CODEHOOK_USAGE_LOG") {
         append_usage_log(&path, &input);
+    }
+
+    if let Some(line) = tool_call_detail_line(&input) {
+        if env_enabled("CODEHOOK_PRINT_TOOL_DETAILS") {
+            eprintln!("{line}");
+        }
+
+        if let Ok(path) = env::var("CODEHOOK_TOOL_CALL_LOG")
+            && let Err(error) = append_line(&path, &line)
+        {
+            eprintln!("{error}");
+        }
     }
 
     if let Some(output) = outcome.output {
@@ -143,6 +155,15 @@ fn expand_home(path: &str) -> String {
     path.to_string()
 }
 
+fn env_enabled(name: &str) -> bool {
+    env::var(name).is_ok_and(|value| {
+        !matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "0" | "false" | "no" | "off"
+        )
+    })
+}
+
 fn print_help() {
     println!(
         "codehook\n\n\
@@ -158,6 +179,9 @@ fn print_help() {
            CODEHOOK_AUDIT_LOG=/path/log.jsonl Append metadata-only audit entries.\n\
            CODEHOOK_USAGE_LOG=/path/usage.jsonl\n\
                                              Append token usage records when usage data is present.\n\
+           CODEHOOK_PRINT_TOOL_DETAILS=1     Print post-tool call details to stderr as JSON.\n\
+           CODEHOOK_TOOL_CALL_LOG=/path/tool-calls.jsonl\n\
+                                             Append post-tool call detail records as JSONL.\n\
            CODEHOOK_USAGE_FROM_TRANSCRIPT=0    Disable transcript fallback usage extraction.\n"
     );
 }
